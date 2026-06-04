@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Backspin — Personal Golf Score Tracker</title>
+    <meta
+      name="description"
+      content="Backspin is a fast personal golf score tracker with local history and JSON backup tools."
+    />
+    <link rel="stylesheet" href="styles.css?v=20260604-danger-contrast" />
+    <script defer src="script.js?v=20260604-appearance-top"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand-lockup" aria-label="Backspin">
+          <span class="brand-mark" aria-hidden="true">B</span>
+          <div>
+            <h1>Backspin</h1>
+            <p>Personal score tracker</p>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <nav class="view-tabs" aria-label="Primary views">
+            <button type="button" data-view="play">Play</button>
+            <button type="button" data-view="history">History</button>
+            <button type="button" data-view="setup">Setup</button>
+            <button type="button" data-view="data">Data</button>
+          </nav>
+        </div>
+      </header>
+
+      <main class="app-main">
+        <section id="view-play" data-view-panel="play" aria-label="Play mode"></section>
+        <section id="view-history" data-view-panel="history" aria-label="History explorer" hidden></section>
+        <section id="view-setup" data-view-panel="setup" aria-label="Course setup" hidden></section>
+        <section id="view-data" data-view-panel="data" aria-label="Data tools" hidden></section>
+      </main>
+    </div>
+  </body>
+</html>
