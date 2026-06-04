@@ -2,6 +2,9 @@
 
 Backspin is a mobile-first personal golf score tracker. It stores one active course, one current round, and the last 20 archived rounds locally in your browser.
 
+## try online
+[launch in Browser](https://theextendedname.github.io/backspin/)
+
 ## Run locally
 
 From this folder:
