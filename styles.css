@@ -420,6 +420,26 @@ textarea:focus-visible {
   gap: 10px;
 }
 
+.history-summary-card {
+  margin-top: 2px;
+}
+
+.history-summary-title {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+  letter-spacing: -0.04em;
+}
+
+.history-summary-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.history-summary-note {
+  margin: 12px 0 0;
+}
+
 .history-row {
   display: grid;
   grid-template-columns: 44px minmax(78px, 0.8fr) 1.4fr;
@@ -643,5 +663,9 @@ button:disabled {
   .course-row {
     grid-template-columns: 38px 1fr 1fr;
     gap: 8px;
+  }
+
+  .history-summary-grid {
+    grid-template-columns: 1fr;
   }
 }

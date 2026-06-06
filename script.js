@@ -325,9 +325,10 @@ function getRoundGrossScore(round) {
 }
 
 function getRoundToParScore(round, course = getActiveCourse()) {
+  const holes = round.courseHoles || course.holes;
   return round.scores.reduce((total, score, index) => {
     if (!Number.isFinite(score)) return total;
-    return total + score - course.holes[index].par;
+    return total + score - holes[index].par;
   }, 0);
 }
 
@@ -358,6 +359,17 @@ function getLastFiveScoresForHole(holeIndex, rounds = getActiveCourseRounds()) {
 
 function getPlayedHoleCount(round = state.currentRound) {
   return round.scores.filter((score) => Number.isFinite(score)).length;
+}
+
+function getRecentRoundSummary(rounds = getActiveCourseRounds(), limit = 10) {
+  return rounds.slice(0, limit).reduce(
+    (summary, round) => ({
+      grossTotal: summary.grossTotal + getRoundGrossScore(round),
+      toParTotal: summary.toParTotal + getRoundToParScore(round),
+      holesPlayed: summary.holesPlayed + getPlayedHoleCount(round),
+    }),
+    { grossTotal: 0, toParTotal: 0, holesPlayed: 0 },
+  );
 }
 
 function getTotalPar(course = getActiveCourse()) {
@@ -484,6 +496,11 @@ function renderHistoryView() {
   const course = getActiveCourse();
   const rounds = getActiveCourseRounds();
   const hasHistory = rounds.length > 0;
+  const recentSummary = getRecentRoundSummary(rounds, 10);
+  const recentRoundCount = Math.min(rounds.length, 10);
+  const grossTotal = recentRoundCount ? recentSummary.grossTotal : '—';
+  const toParScore = recentRoundCount ? formatToParScore(recentSummary.toParTotal) : '—';
+  const holesPlayed = recentRoundCount ? recentSummary.holesPlayed : '—';
   panel.innerHTML = `
     <article class="panel-card">
       <div class="panel-inner">
@@ -496,6 +513,28 @@ function renderHistoryView() {
     ${hasHistory ? `<div class="history-list">${course.holes.map((hole, index) => renderHistoryRow(hole, index, rounds)).join('')}</div>` : `
       <div class="notice">Start a new round after entering scores to build history for ${escapeHtml(course.name)}.</div>
     `}
+
+    <article class="panel-card history-summary-card" data-history-summary>
+      <div class="panel-inner">
+        <p class="section-kicker">Last 10 rounds</p>
+        <h3 class="history-summary-title">Recent round totals.</h3>
+        <div class="history-summary-grid" aria-label="Summary for the last 10 rounds">
+          <div class="stat-card">
+            <span class="stat-label">Gross total</span>
+            <span class="stat-value">${grossTotal}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">To-par score</span>
+            <span class="stat-value">${toParScore}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Holes played</span>
+            <span class="stat-value">${holesPlayed}</span>
+          </div>
+        </div>
+        <p class="section-copy history-summary-note">Calculated from the ${recentRoundCount || 0} most recent archived rounds for ${escapeHtml(course.name)}.</p>
+      </div>
+    </article>
   `;
 }
 
