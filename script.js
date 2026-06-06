@@ -361,15 +361,21 @@ function getPlayedHoleCount(round = state.currentRound) {
   return round.scores.filter((score) => Number.isFinite(score)).length;
 }
 
-function getRecentRoundSummary(rounds = getActiveCourseRounds(), limit = 10) {
-  return rounds.slice(0, limit).reduce(
-    (summary, round) => ({
-      grossTotal: summary.grossTotal + getRoundGrossScore(round),
-      toParTotal: summary.toParTotal + getRoundToParScore(round),
-      holesPlayed: summary.holesPlayed + getPlayedHoleCount(round),
-    }),
-    { grossTotal: 0, toParTotal: 0, holesPlayed: 0 },
-  );
+function getRecentRounds(rounds = getActiveCourseRounds(), limit = 10) {
+  return rounds.slice(0, limit).map((round, index) => ({
+    round,
+    index,
+    grossTotal: getRoundGrossScore(round),
+    toParTotal: getRoundToParScore(round),
+    holesPlayed: getPlayedHoleCount(round),
+  }));
+}
+
+function formatRoundDate(round) {
+  const timestamp = round.completedAt || round.updatedAt || round.startedAt;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'Round';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function getTotalPar(course = getActiveCourse()) {
@@ -496,11 +502,7 @@ function renderHistoryView() {
   const course = getActiveCourse();
   const rounds = getActiveCourseRounds();
   const hasHistory = rounds.length > 0;
-  const recentSummary = getRecentRoundSummary(rounds, 10);
-  const recentRoundCount = Math.min(rounds.length, 10);
-  const grossTotal = recentRoundCount ? recentSummary.grossTotal : '—';
-  const toParScore = recentRoundCount ? formatToParScore(recentSummary.toParTotal) : '—';
-  const holesPlayed = recentRoundCount ? recentSummary.holesPlayed : '—';
+  const recentRounds = getRecentRounds(rounds, 10);
   panel.innerHTML = `
     <article class="panel-card">
       <div class="panel-inner">
@@ -517,24 +519,28 @@ function renderHistoryView() {
     <article class="panel-card history-summary-card" data-history-summary>
       <div class="panel-inner">
         <p class="section-kicker">Last 10 rounds</p>
-        <h3 class="history-summary-title">Recent round totals.</h3>
-        <div class="history-summary-grid" aria-label="Summary for the last 10 rounds">
-          <div class="stat-card">
-            <span class="stat-label">Gross total</span>
-            <span class="stat-value">${grossTotal}</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">To-par score</span>
-            <span class="stat-value">${toParScore}</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Holes played</span>
-            <span class="stat-value">${holesPlayed}</span>
-          </div>
+        <h3 class="history-summary-title">Recent rounds.</h3>
+        <div class="round-total-list" aria-label="Last 10 round totals">
+          ${recentRounds.length ? recentRounds.map((roundData) => renderRoundTotalRow(roundData)).join('') : `
+            <p class="section-copy history-empty-note">No archived rounds yet.</p>
+          `}
         </div>
-        <p class="section-copy history-summary-note">Calculated from the ${recentRoundCount || 0} most recent archived rounds for ${escapeHtml(course.name)}.</p>
       </div>
     </article>
+  `;
+}
+
+function renderRoundTotalRow({ round, index, grossTotal, toParTotal, holesPlayed }) {
+  const roundLabel = `R${index + 1}`;
+  const dateLabel = formatRoundDate(round);
+  return `
+    <div class="round-total-row">
+      <span class="round-total-main">${roundLabel}</span>
+      <span class="round-total-date">${escapeHtml(dateLabel)}</span>
+      <span class="round-total-stat"><strong>${grossTotal || '—'}</strong> gross</span>
+      <span class="round-total-stat"><strong>${holesPlayed ? formatToParScore(toParTotal) : '—'}</strong> par</span>
+      <span class="round-total-stat"><strong>${holesPlayed}</strong>/18</span>
+    </div>
   `;
 }
 
@@ -550,7 +556,7 @@ function renderHistoryRow(hole, index, rounds) {
     <article class="history-row">
       <div class="history-hole">#${hole.number}</div>
       <div class="history-meta">Par ${hole.par}<br>${hole.yardage} yds</div>
-      <div>
+      <div class="history-scores">
         <div class="score-pills" aria-label="Last 10 scores for hole ${hole.number}">
           ${lastTen.length ? lastTen.map((score) => `<span class="score-pill">${score}</span>`).join('') : '<span class="score-pill">—</span>'}
         </div>
