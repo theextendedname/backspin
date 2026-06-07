@@ -4,6 +4,7 @@ const VALID_THEMES = ['light', 'dark'];
 const MAX_COURSES = 10;
 
 let state = loadState();
+let isRoundConfirmOpen = false;
 
 function makeId() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
@@ -163,6 +164,7 @@ function getActiveCourseRounds(rounds = state.roundHistory) {
 function setActiveView(view) {
   if (!VALID_VIEWS.includes(view)) return;
   state.activeView = view;
+  if (view !== 'play') isRoundConfirmOpen = false;
   saveState();
   renderApp();
 }
@@ -226,7 +228,18 @@ function archiveCurrentRoundIfNeeded() {
 }
 
 function startNewRound() {
-  if (!confirm(formatRoundSummaryMessage())) return false;
+  isRoundConfirmOpen = true;
+  renderApp();
+  return false;
+}
+
+function closeRoundConfirmDrawer() {
+  isRoundConfirmOpen = false;
+  renderApp();
+}
+
+function confirmStartNewRound() {
+  isRoundConfirmOpen = false;
   archiveCurrentRoundIfNeeded();
   state.currentRound = createEmptyRound(getActiveCourse().id);
   state.activeView = 'play';
@@ -427,6 +440,45 @@ function renderApp() {
   renderHistoryView();
   renderSetupView();
   renderDataView();
+  renderRoundConfirmDrawer();
+}
+
+function renderRoundConfirmDrawer() {
+  document.querySelector('[data-round-confirm-drawer]')?.remove();
+  if (!isRoundConfirmOpen) return;
+
+  const summary = getRoundSummary();
+  const drawer = document.createElement('div');
+  drawer.className = 'round-confirm-shell';
+  drawer.dataset.roundConfirmDrawer = 'true';
+  drawer.innerHTML = `
+    <button type="button" class="round-confirm-backdrop" data-action="close-round-confirm" aria-label="Keep playing"></button>
+    <section class="round-confirm-drawer" role="dialog" aria-modal="true" aria-labelledby="round-confirm-title">
+      <div class="drawer-handle" aria-hidden="true"></div>
+      <p class="section-kicker">Round checkpoint</p>
+      <h2 id="round-confirm-title" class="drawer-title">Start new round?</h2>
+      <p class="section-copy drawer-copy">This round will be saved to History before a fresh scorecard opens.</p>
+      <div class="drawer-stat-grid" aria-label="Current round stats">
+        <article class="stat-card">
+          <span class="stat-label">Gross total</span>
+          <span class="stat-value">${summary.holesPlayed ? summary.grossTotal : '—'}</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">To-par score</span>
+          <span class="stat-value">${summary.holesPlayed ? formatToParScore(summary.toParScore) : '—'}</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Holes played</span>
+          <span class="stat-value">${summary.holesPlayed}/18</span>
+        </article>
+      </div>
+      <div class="drawer-actions">
+        <button type="button" class="button" data-action="confirm-new-round">Start New Round</button>
+        <button type="button" class="secondary-button" data-action="close-round-confirm">Keep Playing</button>
+      </div>
+    </section>
+  `;
+  document.body.appendChild(drawer);
 }
 
 function renderPlayView() {
@@ -712,6 +764,8 @@ function handleClick(event) {
   if (action === 'previous-hole') setActiveHole(Math.max(0, currentIndex - 1));
   if (action === 'next-hole') setActiveHole(Math.min(17, currentIndex + 1));
   if (action === 'new-round') startNewRound();
+  if (action === 'confirm-new-round') confirmStartNewRound();
+  if (action === 'close-round-confirm') closeRoundConfirmDrawer();
   if (action === 'toggle-theme') toggleTheme();
   if (action === 'add-course') addCourse();
   if (action === 'copy-course') copyCourse();
@@ -827,6 +881,8 @@ globalThis.BackspinApp = {
   formatRoundSummaryMessage,
   formatToParScore,
   startNewRound,
+  confirmStartNewRound,
+  closeRoundConfirmDrawer,
   activateCourse,
   addCourse,
   copyCourse,
