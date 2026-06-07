@@ -441,7 +441,7 @@ textarea:focus-visible {
 
 .round-total-row {
   display: grid;
-  grid-template-columns: auto minmax(64px, 1fr) auto auto auto;
+  grid-template-columns: minmax(64px, 1fr) auto auto auto;
   gap: 8px;
   align-items: center;
   min-height: 36px;
@@ -458,7 +458,11 @@ textarea:focus-visible {
   font-weight: 950;
 }
 
-.round-total-date,
+.round-total-main.round-total-date {
+  color: var(--text);
+}
+
+.round-total-date:not(.round-total-main),
 .round-total-stat {
   color: var(--muted);
   font-size: 0.76rem;

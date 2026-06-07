@@ -226,11 +226,13 @@ function archiveCurrentRoundIfNeeded() {
 }
 
 function startNewRound() {
+  if (!confirm(formatRoundSummaryMessage())) return false;
   archiveCurrentRoundIfNeeded();
   state.currentRound = createEmptyRound(getActiveCourse().id);
   state.activeView = 'play';
   saveState();
   renderApp();
+  return true;
 }
 
 function activateCourse(courseId) {
@@ -334,6 +336,25 @@ function getRoundToParScore(round, course = getActiveCourse()) {
 
 function formatToParScore(value) {
   return value >= 0 ? `+${value}` : `${value}`;
+}
+
+function getRoundSummary(round = state.currentRound, course = getActiveCourse()) {
+  const holesPlayed = getPlayedHoleCount(round);
+  const grossTotal = getRoundGrossScore(round);
+  const toParScore = getRoundToParScore(round, course);
+  return { grossTotal, toParScore, holesPlayed };
+}
+
+function formatRoundSummaryMessage(summary = getRoundSummary()) {
+  return [
+    'Start a new round?',
+    '',
+    `Gross total: ${summary.holesPlayed ? summary.grossTotal : '—'}`,
+    `To-par score: ${summary.holesPlayed ? formatToParScore(summary.toParScore) : '—'}`,
+    `Holes played: ${summary.holesPlayed}/18`,
+    '',
+    'Continue to archive this round and start fresh, or cancel to keep playing.',
+  ].join('\n');
 }
 
 function getHoleScores(holeIndex, rounds = getActiveCourseRounds()) {
@@ -530,13 +551,11 @@ function renderHistoryView() {
   `;
 }
 
-function renderRoundTotalRow({ round, index, grossTotal, toParTotal, holesPlayed }) {
-  const roundLabel = `R${index + 1}`;
+function renderRoundTotalRow({ round, grossTotal, toParTotal, holesPlayed }) {
   const dateLabel = formatRoundDate(round);
   return `
     <div class="round-total-row">
-      <span class="round-total-main">${roundLabel}</span>
-      <span class="round-total-date">${escapeHtml(dateLabel)}</span>
+      <span class="round-total-main round-total-date">${escapeHtml(dateLabel)}</span>
       <span class="round-total-stat"><strong>${grossTotal || '—'}</strong> gross</span>
       <span class="round-total-stat"><strong>${holesPlayed ? formatToParScore(toParTotal) : '—'}</strong> par</span>
       <span class="round-total-stat"><strong>${holesPlayed}</strong>/18</span>
@@ -804,6 +823,8 @@ globalThis.BackspinApp = {
   getLastFiveScoresForHole,
   getRoundGrossScore,
   getRoundToParScore,
+  getRoundSummary,
+  formatRoundSummaryMessage,
   formatToParScore,
   startNewRound,
   activateCourse,
