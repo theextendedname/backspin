@@ -201,6 +201,12 @@ textarea:focus-visible {
   margin-top: 8px;
 }
 
+.last-five-card .score-pill {
+  min-width: 28px;
+  height: 28px;
+  font-size: calc(0.7rem + 2px);
+}
+
 .view-panel {
   display: grid;
   gap: 16px;
@@ -241,8 +247,12 @@ textarea:focus-visible {
 
 .top-grid {
   display: grid;
-  gap: 12px;
-  grid-template-columns: 1fr;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.top-grid .stat-card:first-child {
+  grid-column: 1 / -1;
 }
 
 .stat-card {
@@ -738,7 +748,12 @@ button:disabled {
   }
 
   .top-grid {
+    gap: 12px;
     grid-template-columns: repeat(4, 1fr);
+  }
+
+  .top-grid .stat-card:first-child {
+    grid-column: auto;
   }
 
   .hole-card {
@@ -782,6 +797,12 @@ button:disabled {
     height: 20px;
     padding: 0 4px;
     font-size: 0.62rem;
+  }
+
+  .last-five-card .score-pill {
+    min-width: 24px;
+    height: 24px;
+    font-size: calc(0.62rem + 2px);
   }
 
   .round-total-row {
