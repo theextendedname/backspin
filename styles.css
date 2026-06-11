@@ -346,6 +346,51 @@ textarea:focus-visible {
   text-align: center;
 }
 
+.regulation-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: -4px;
+}
+
+.regulation-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--control-bg);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.regulation-toggle.is-checked {
+  color: #18130a;
+  border-color: transparent;
+  background: linear-gradient(145deg, #f1d58f, #c99b46);
+}
+
+.regulation-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.info-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  line-height: 1;
+  opacity: 0.75;
+}
+
 .score-row {
   display: flex;
   align-items: center;
@@ -525,7 +570,7 @@ textarea:focus-visible {
 
 .round-total-row {
   display: grid;
-  grid-template-columns: minmax(64px, 1fr) auto auto auto;
+  grid-template-columns: minmax(58px, 1fr) auto auto auto auto auto;
   gap: 8px;
   align-items: center;
   min-height: 36px;
@@ -806,8 +851,8 @@ button:disabled {
   }
 
   .round-total-row {
-    grid-template-columns: minmax(52px, 1fr) auto auto auto;
-    gap: 6px;
+    grid-template-columns: minmax(52px, 1fr) repeat(5, auto);
+    gap: 5px 6px;
     padding-inline: 8px;
   }
 

@@ -36,6 +36,8 @@ function createEmptyRound(courseId) {
     updatedAt: now,
     activeHoleIndex: 0,
     scores: Array(18).fill(null),
+    fir: Array(18).fill(false),
+    gir: Array(18).fill(false),
   };
 }
 
@@ -124,6 +126,8 @@ function normalizeRound(round, fallback, fallbackCourseId) {
   if (!round || typeof round !== 'object') return fallback;
   const fallbackRound = fallback || createEmptyRound(fallbackCourseId);
   const scores = Array.isArray(round.scores) ? round.scores : [];
+  const fir = Array.isArray(round.fir) ? round.fir : [];
+  const gir = Array.isArray(round.gir) ? round.gir : [];
   const activeHoleIndex = Number(round.activeHoleIndex);
   return {
     id: typeof round.id === 'string' && round.id ? round.id : fallbackRound.id,
@@ -135,12 +139,18 @@ function normalizeRound(round, fallback, fallbackCourseId) {
     courseHoles: Array.isArray(round.courseHoles) ? round.courseHoles : undefined,
     activeHoleIndex: Number.isInteger(activeHoleIndex) && activeHoleIndex >= 0 && activeHoleIndex < 18 ? activeHoleIndex : 0,
     scores: Array.from({ length: 18 }, (_, index) => normalizeScore(scores[index])),
+    fir: Array.from({ length: 18 }, (_, index) => normalizeBoolean(fir[index])),
+    gir: Array.from({ length: 18 }, (_, index) => normalizeBoolean(gir[index])),
   };
 }
 
 function normalizeScore(value) {
   const score = Number(value);
   return Number.isInteger(score) && score > 0 ? score : null;
+}
+
+function normalizeBoolean(value) {
+  return value === true;
 }
 
 function escapeHtml(value) {
@@ -188,6 +198,22 @@ function getCurrentScore() {
   return state.currentRound.scores[state.currentRound.activeHoleIndex];
 }
 
+function getCurrentRegulationStat(stat) {
+  return state.currentRound[stat]?.[state.currentRound.activeHoleIndex] === true;
+}
+
+function setCurrentRegulationStat(stat, value) {
+  if (!['fir', 'gir'].includes(stat)) return;
+  state.currentRound.courseId = getActiveCourse().id;
+  if (!Array.isArray(state.currentRound[stat])) {
+    state.currentRound[stat] = Array(18).fill(false);
+  }
+  state.currentRound[stat][state.currentRound.activeHoleIndex] = value === true;
+  state.currentRound.updatedAt = new Date().toISOString();
+  saveState();
+  renderApp();
+}
+
 function setActiveHole(index) {
   if (!Number.isInteger(index) || index < 0 || index > 17) return;
   state.currentRound.activeHoleIndex = index;
@@ -218,6 +244,8 @@ function snapshotCurrentRound() {
     courseName: course.name,
     courseHoles: course.holes.map((hole) => ({ ...hole })),
     scores: [...state.currentRound.scores],
+    fir: Array.from({ length: 18 }, (_, index) => state.currentRound.fir?.[index] === true),
+    gir: Array.from({ length: 18 }, (_, index) => state.currentRound.gir?.[index] === true),
   };
 }
 
@@ -391,6 +419,19 @@ function getLastFiveScoresForHole(holeIndex, rounds = getActiveCourseRounds()) {
     .slice(0, 5);
 }
 
+function getHoleRegulationTotals(holeIndex, rounds = getActiveCourseRounds()) {
+  return {
+    fir: rounds.filter((round) => round.fir?.[holeIndex] === true).length,
+    gir: rounds.filter((round) => round.gir?.[holeIndex] === true).length,
+    total: rounds.length,
+  };
+}
+
+function getRoundRegulationTotal(round, stat) {
+  if (!Array.isArray(round?.[stat])) return 0;
+  return round[stat].filter((value) => value === true).length;
+}
+
 function getPlayedHoleCount(round = state.currentRound) {
   return round.scores.filter((score) => Number.isFinite(score)).length;
 }
@@ -402,6 +443,8 @@ function getRecentRounds(rounds = getActiveCourseRounds(), limit = 10) {
     grossTotal: getRoundGrossScore(round),
     toParTotal: getRoundToParScore(round),
     holesPlayed: getPlayedHoleCount(round),
+    firTotal: getRoundRegulationTotal(round, 'fir'),
+    girTotal: getRoundRegulationTotal(round, 'gir'),
   }));
 }
 
@@ -491,6 +534,8 @@ function renderPlayView() {
   const toPar = getRoundToParScore(state.currentRound, course);
   const played = getPlayedHoleCount();
   const lastFive = getLastFiveScoresForHole(state.currentRound.activeHoleIndex);
+  const firChecked = getCurrentRegulationStat('fir');
+  const girChecked = getCurrentRegulationStat('gir');
 
   panel.innerHTML = `
     <div class="top-grid">
@@ -543,6 +588,19 @@ function renderPlayView() {
           <span class="score-value ${score ? '' : 'score-empty'}" aria-live="polite">${score ?? '—'}</span>
           <button type="button" class="score-button" data-action="increment-score" aria-label="Increase score">+</button>
         </div>
+      </div>
+
+      <div class="regulation-row" aria-label="Regulation stats for current hole">
+        <label class="regulation-toggle ${firChecked ? 'is-checked' : ''}" data-action="toggle-fir">
+          <input type="checkbox" data-reg-field="fir" ${firChecked ? 'checked' : ''} />
+          <span class="regulation-text">FIR</span>
+          <span class="info-icon" title="Fairway in Regulation" aria-label="Fairway in Regulation">i</span>
+        </label>
+        <label class="regulation-toggle ${girChecked ? 'is-checked' : ''}" data-action="toggle-gir">
+          <input type="checkbox" data-reg-field="gir" ${girChecked ? 'checked' : ''} />
+          <span class="regulation-text">GIR</span>
+          <span class="info-icon" title="Green in Regulation" aria-label="Green in Regulation">i</span>
+        </label>
       </div>
 
       <div class="metric-grid">
@@ -603,7 +661,7 @@ function renderHistoryView() {
   `;
 }
 
-function renderRoundTotalRow({ round, grossTotal, toParTotal, holesPlayed }) {
+function renderRoundTotalRow({ round, grossTotal, toParTotal, holesPlayed, firTotal, girTotal }) {
   const dateLabel = formatRoundDate(round);
   return `
     <div class="round-total-row">
@@ -611,17 +669,21 @@ function renderRoundTotalRow({ round, grossTotal, toParTotal, holesPlayed }) {
       <span class="round-total-stat"><strong>${grossTotal || '—'}</strong> gross</span>
       <span class="round-total-stat"><strong>${holesPlayed ? formatToParScore(toParTotal) : '—'}</strong> par</span>
       <span class="round-total-stat"><strong>${holesPlayed}</strong>/18</span>
+      <span class="round-total-stat"><strong>${firTotal}</strong> Total FIR</span>
+      <span class="round-total-stat"><strong>${girTotal}</strong> Total GIR</span>
     </div>
   `;
 }
 
 function renderHistoryRow(hole, index, rounds) {
   const metrics = getHoleMetrics(index, rounds);
+  const regulationTotals = getHoleRegulationTotals(index, rounds);
   const lastTen = rounds
     .map((round) => round.scores?.[index])
     .filter((score) => Number.isFinite(score))
     .slice(0, 10);
   const avg = metrics.avg === null ? '—' : metrics.avg.toFixed(1);
+  const regulationDenominator = regulationTotals.total || 0;
 
   return `
     <article class="history-row">
@@ -635,6 +697,8 @@ function renderHistoryRow(hole, index, rounds) {
           <span class="metric-pill badge-low">Low ${metrics.low ?? '—'}</span>
           <span class="metric-pill badge-high">High ${metrics.high ?? '—'}</span>
           <span class="metric-pill">Avg ${avg}</span>
+          <span class="metric-pill">FIR ${regulationTotals.fir}/${regulationDenominator}</span>
+          <span class="metric-pill">GIR ${regulationTotals.gir}/${regulationDenominator}</span>
         </div>
       </div>
     </article>
@@ -808,6 +872,10 @@ function handleSubmit(event) {
 }
 
 function handleChange(event) {
+  if (event.target.matches('[data-reg-field]')) {
+    setCurrentRegulationStat(event.target.dataset.regField, event.target.checked);
+    return;
+  }
   if (event.target.matches('[data-action="import-json"]')) {
     importJson(event.target.files?.[0]);
   }
@@ -874,6 +942,8 @@ globalThis.BackspinApp = {
   getActiveCourseRounds,
   getHoleScores,
   getHoleMetrics,
+  getHoleRegulationTotals,
+  getRoundRegulationTotal,
   getLastFiveScoresForHole,
   getRoundGrossScore,
   getRoundToParScore,
@@ -893,4 +963,5 @@ globalThis.BackspinApp = {
   setActiveView,
   setActiveHole,
   setCurrentScore,
+  setCurrentRegulationStat,
 };
