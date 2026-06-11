@@ -373,22 +373,55 @@ textarea:focus-visible {
   background: linear-gradient(145deg, #f1d58f, #c99b46);
 }
 
+.regulation-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .regulation-toggle input {
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
 }
 
-.info-icon {
+.info-button {
   display: inline-grid;
   place-items: center;
-  width: 17px;
-  height: 17px;
+  width: 22px;
+  height: 22px;
   border: 1px solid currentColor;
   border-radius: 999px;
-  font-size: 0.66rem;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 0.78rem;
   line-height: 1;
-  opacity: 0.75;
+  font-weight: 950;
+  opacity: 0.85;
+}
+
+.info-button[aria-expanded="true"] {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.regulation-help {
+  justify-self: center;
+  max-width: min(420px, 100%);
+  margin-top: -4px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--muted);
+  background: var(--control-bg);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.regulation-help strong {
+  color: var(--text);
 }
 
 .score-row {

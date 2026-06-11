@@ -5,6 +5,20 @@ const MAX_COURSES = 10;
 
 let state = loadState();
 let isRoundConfirmOpen = false;
+let activeRegulationHelp = null;
+
+const REGULATION_HELP = {
+  fir: {
+    label: 'FIR',
+    title: 'Fairway in Regulation',
+    description: 'Your tee shot finishes in the fairway.',
+  },
+  gir: {
+    label: 'GIR',
+    title: 'Green in Regulation',
+    description: 'You reach the green with at least two strokes left for par.',
+  },
+};
 
 function makeId() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
@@ -174,7 +188,10 @@ function getActiveCourseRounds(rounds = state.roundHistory) {
 function setActiveView(view) {
   if (!VALID_VIEWS.includes(view)) return;
   state.activeView = view;
-  if (view !== 'play') isRoundConfirmOpen = false;
+  if (view !== 'play') {
+    isRoundConfirmOpen = false;
+    activeRegulationHelp = null;
+  }
   saveState();
   renderApp();
 }
@@ -211,6 +228,12 @@ function setCurrentRegulationStat(stat, value) {
   state.currentRound[stat][state.currentRound.activeHoleIndex] = value === true;
   state.currentRound.updatedAt = new Date().toISOString();
   saveState();
+  renderApp();
+}
+
+function toggleRegulationHelp(stat) {
+  if (!REGULATION_HELP[stat]) return;
+  activeRegulationHelp = activeRegulationHelp === stat ? null : stat;
   renderApp();
 }
 
@@ -536,6 +559,7 @@ function renderPlayView() {
   const lastFive = getLastFiveScoresForHole(state.currentRound.activeHoleIndex);
   const firChecked = getCurrentRegulationStat('fir');
   const girChecked = getCurrentRegulationStat('gir');
+  const activeHelp = REGULATION_HELP[activeRegulationHelp];
 
   panel.innerHTML = `
     <div class="top-grid">
@@ -591,17 +615,26 @@ function renderPlayView() {
       </div>
 
       <div class="regulation-row" aria-label="Regulation stats for current hole">
-        <label class="regulation-toggle ${firChecked ? 'is-checked' : ''}" data-action="toggle-fir">
-          <input type="checkbox" data-reg-field="fir" ${firChecked ? 'checked' : ''} />
-          <span class="regulation-text">FIR</span>
-          <span class="info-icon" title="Fairway in Regulation" aria-label="Fairway in Regulation">i</span>
-        </label>
-        <label class="regulation-toggle ${girChecked ? 'is-checked' : ''}" data-action="toggle-gir">
-          <input type="checkbox" data-reg-field="gir" ${girChecked ? 'checked' : ''} />
-          <span class="regulation-text">GIR</span>
-          <span class="info-icon" title="Green in Regulation" aria-label="Green in Regulation">i</span>
-        </label>
+        <div class="regulation-toggle ${firChecked ? 'is-checked' : ''}">
+          <label class="regulation-label">
+            <input type="checkbox" data-reg-field="fir" ${firChecked ? 'checked' : ''} />
+            <span class="regulation-text">FIR</span>
+          </label>
+          <button type="button" class="info-button" data-action="show-reg-help" data-reg-help="fir" aria-label="What is FIR?" aria-expanded="${activeRegulationHelp === 'fir'}" aria-controls="regulation-help-panel">?</button>
+        </div>
+        <div class="regulation-toggle ${girChecked ? 'is-checked' : ''}">
+          <label class="regulation-label">
+            <input type="checkbox" data-reg-field="gir" ${girChecked ? 'checked' : ''} />
+            <span class="regulation-text">GIR</span>
+          </label>
+          <button type="button" class="info-button" data-action="show-reg-help" data-reg-help="gir" aria-label="What is GIR?" aria-expanded="${activeRegulationHelp === 'gir'}" aria-controls="regulation-help-panel">?</button>
+        </div>
       </div>
+      ${activeHelp ? `
+        <div id="regulation-help-panel" class="regulation-help" data-reg-help-panel role="status">
+          <strong>${activeHelp.label}</strong> — ${activeHelp.title}: ${activeHelp.description}
+        </div>
+      ` : ''}
 
       <div class="metric-grid">
         <div class="stat-card">
@@ -828,6 +861,7 @@ function handleClick(event) {
   if (action === 'previous-hole') setActiveHole(Math.max(0, currentIndex - 1));
   if (action === 'next-hole') setActiveHole(Math.min(17, currentIndex + 1));
   if (action === 'new-round') startNewRound();
+  if (action === 'show-reg-help') toggleRegulationHelp(actionButton.dataset.regHelp);
   if (action === 'confirm-new-round') confirmStartNewRound();
   if (action === 'close-round-confirm') closeRoundConfirmDrawer();
   if (action === 'toggle-theme') toggleTheme();
@@ -964,4 +998,5 @@ globalThis.BackspinApp = {
   setActiveHole,
   setCurrentScore,
   setCurrentRegulationStat,
+  toggleRegulationHelp,
 };
