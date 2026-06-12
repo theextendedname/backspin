@@ -812,6 +812,10 @@ textarea:focus-visible {
   align-items: center;
 }
 
+.history-scores .metric-pills {
+  justify-content: flex-start;
+}
+
 .history-value-row .score-pill {
   width: 32px;
   padding: 0;
@@ -1046,11 +1050,15 @@ button:disabled {
   }
 
   .history-scores .score-pills,
-  .history-scores .metric-pills,
   .history-scores .putt-pills,
   .history-scores .regulation-pills {
     gap: 3px;
     justify-content: flex-end;
+  }
+
+  .history-scores .metric-pills {
+    gap: 3px;
+    justify-content: flex-start;
   }
 
   .history-scores .history-value-row {
