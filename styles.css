@@ -745,6 +745,23 @@ textarea:focus-visible {
   font-weight: 950;
 }
 
+.table-header-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.table-info-button {
+  width: 18px;
+  height: 18px;
+  font-size: 0.66rem;
+  color: var(--accent);
+}
+
+.putts-help {
+  margin: 8px auto 0;
+}
+
 .history-empty-note {
   margin: 0;
 }
@@ -780,22 +797,39 @@ textarea:focus-visible {
 
 .score-pills,
 .metric-pills,
-.putt-pills {
+.putt-pills,
+.regulation-pills {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 4px;
 }
 
-.gross-label,
-.putt-label {
+.history-value-row {
+  display: grid;
+  grid-template-columns: 42px repeat(10, 32px);
+  justify-content: end;
+  align-items: center;
+}
+
+.history-value-row .score-pill {
+  width: 32px;
+  padding: 0;
+}
+
+.history-stat-label {
   display: inline-grid;
-  place-items: center;
+  flex: 0 0 42px;
+  place-items: center start;
   color: var(--subtle);
   font-size: 0.68rem;
   font-weight: 950;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.regulation-pill {
+  color: var(--muted);
 }
 
 .putt-pill {
@@ -1013,9 +1047,26 @@ button:disabled {
 
   .history-scores .score-pills,
   .history-scores .metric-pills,
-  .history-scores .putt-pills {
+  .history-scores .putt-pills,
+  .history-scores .regulation-pills {
     gap: 3px;
     justify-content: flex-end;
+  }
+
+  .history-scores .history-value-row {
+    grid-template-columns: 34px repeat(10, 20px);
+    justify-content: end;
+  }
+
+  .history-scores .history-value-row .score-pill {
+    width: 20px;
+    padding: 0;
+  }
+
+  .history-stat-label {
+    flex-basis: 34px;
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
   }
 
   .score-pill,

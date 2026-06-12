@@ -8,6 +8,7 @@ const PUTTS_WHEEL_VALUES = [null, 0, 1, 2, 3, '4++'];
 let state = loadState();
 let isRoundConfirmOpen = false;
 let activeRegulationHelp = null;
+let isPuttsHelpOpen = false;
 
 const REGULATION_HELP = {
   fir: {
@@ -218,6 +219,9 @@ function setActiveView(view) {
     isRoundConfirmOpen = false;
     activeRegulationHelp = null;
   }
+  if (view !== 'history') {
+    isPuttsHelpOpen = false;
+  }
   saveState();
   renderApp();
 }
@@ -264,6 +268,11 @@ function setCurrentRegulationStat(stat, value) {
 function toggleRegulationHelp(stat) {
   if (!REGULATION_HELP[stat]) return;
   activeRegulationHelp = activeRegulationHelp === stat ? null : stat;
+  renderApp();
+}
+
+function togglePuttsHelp() {
+  isPuttsHelpOpen = !isPuttsHelpOpen;
   renderApp();
 }
 
@@ -830,13 +839,24 @@ function renderRecentRoundsTable(recentRounds) {
     <div class="recent-rounds-table-wrap">
       <table class="recent-rounds-table">
         <thead>
-          <tr>${headers.map((header) => `<th scope="col">${header}</th>`).join('')}</tr>
+          <tr>${headers.map((header) => `
+            <th scope="col">
+              ${header === 'Tot-Putts'
+                ? `<span class="table-header-with-help">${header}<button type="button" class="info-button table-info-button" data-action="show-putts-help" aria-label="What do Tot-Putts markers mean?" aria-expanded="${isPuttsHelpOpen}" aria-controls="putts-help-panel">?</button></span>`
+                : header}
+            </th>
+          `).join('')}</tr>
         </thead>
         <tbody>
           ${recentRounds.slice(0, 10).map((roundData) => renderRoundTotalRow(roundData)).join('')}
         </tbody>
       </table>
     </div>
+    ${isPuttsHelpOpen ? `
+      <div id="putts-help-panel" class="regulation-help putts-help" data-putts-help-panel role="status">
+        <strong>Tot-Putts</strong> — ++ means a 4++ was selected for at least one hole. ! means at least one hole was unset.
+      </div>
+    ` : ''}
   `;
 }
 
@@ -874,20 +894,26 @@ function renderHistoryRow(hole, index, rounds) {
       <div class="history-hole">#${hole.number}</div>
       <div class="history-meta">Par ${hole.par}<br>${hole.yardage} yds</div>
       <div class="history-scores">
-        <div class="score-pills gross-pills" aria-label="Last 10 gross scores for hole ${hole.number}">
-          <span class="gross-label">Gross</span>
+        <div class="score-pills gross-pills history-value-row" aria-label="Last 10 gross scores for hole ${hole.number}">
+          <span class="history-stat-label">Gross</span>
           ${lastTen.length ? lastTen.map((score) => `<span class="score-pill">${Number.isFinite(score) ? score : '—'}</span>`).join('') : '<span class="score-pill">—</span>'}
         </div>
-        <div class="putt-pills" aria-label="Last 10 putts for hole ${hole.number}">
-          <span class="putt-label">Putts</span>
+        <div class="putt-pills history-value-row" aria-label="Last 10 putts for hole ${hole.number}">
+          <span class="history-stat-label">Putts</span>
           ${lastTenPutts.length ? lastTenPutts.map((putt) => `<span class="score-pill putt-pill">${formatPuttDisplay(putt)}</span>`).join('') : '<span class="score-pill putt-pill">—</span>'}
+        </div>
+        <div class="regulation-pills fir-pills history-value-row" aria-label="Last 10 fairways in regulation for hole ${hole.number}">
+          <span class="history-stat-label">FIR</span>
+          ${lastTenFir.length ? lastTenFir.map((isSet) => `<span class="score-pill regulation-pill">${isSet ? '✓' : 'x'}</span>`).join('') : '<span class="score-pill regulation-pill">x</span>'}
+        </div>
+        <div class="regulation-pills gir-pills history-value-row" aria-label="Last 10 greens in regulation for hole ${hole.number}">
+          <span class="history-stat-label">GIR</span>
+          ${lastTenGir.length ? lastTenGir.map((isSet) => `<span class="score-pill regulation-pill">${isSet ? '✓' : 'x'}</span>`).join('') : '<span class="score-pill regulation-pill">x</span>'}
         </div>
         <div class="metric-pills" aria-label="Metrics for hole ${hole.number}">
           <span class="metric-pill badge-low">Low ${metrics.low ?? '—'}</span>
           <span class="metric-pill badge-high">High ${metrics.high ?? '—'}</span>
           <span class="metric-pill">Avg ${avg}</span>
-          ${lastTenFir.length ? lastTenFir.map((isSet) => `<span class="metric-pill">FIR ${isSet ? '🗸' : 'x'}</span>`).join('') : '<span class="metric-pill">FIR x</span>'}
-          ${lastTenGir.length ? lastTenGir.map((isSet) => `<span class="metric-pill">GIR ${isSet ? '🗸' : 'x'}</span>`).join('') : '<span class="metric-pill">GIR x</span>'}
         </div>
       </div>
     </article>
@@ -1019,6 +1045,7 @@ function handleClick(event) {
   if (action === 'next-hole') setActiveHole(Math.min(17, currentIndex + 1));
   if (action === 'new-round') startNewRound();
   if (action === 'show-reg-help') toggleRegulationHelp(actionButton.dataset.regHelp);
+  if (action === 'show-putts-help') togglePuttsHelp();
   if (action === 'confirm-new-round') confirmStartNewRound();
   if (action === 'close-round-confirm') closeRoundConfirmDrawer();
   if (action === 'toggle-theme') toggleTheme();
@@ -1182,4 +1209,5 @@ globalThis.BackspinApp = {
   stepCurrentWheelValue,
   setCurrentRegulationStat,
   toggleRegulationHelp,
+  togglePuttsHelp,
 };
