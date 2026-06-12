@@ -2,6 +2,8 @@ const STORAGE_KEY = 'backspin:v1';
 const VALID_VIEWS = ['play', 'history', 'setup', 'data'];
 const VALID_THEMES = ['light', 'dark'];
 const MAX_COURSES = 10;
+const SCORE_WHEEL_VALUES = [null, ...Array.from({ length: 20 }, (_, index) => index + 1)];
+const PUTTS_WHEEL_VALUES = [null, 0, 1, 2, 3, '4++'];
 
 let state = loadState();
 let isRoundConfirmOpen = false;
@@ -50,6 +52,7 @@ function createEmptyRound(courseId) {
     updatedAt: now,
     activeHoleIndex: 0,
     scores: Array(18).fill(null),
+    putts: Array(18).fill(null),
     fir: Array(18).fill(false),
     gir: Array(18).fill(false),
   };
@@ -140,6 +143,7 @@ function normalizeRound(round, fallback, fallbackCourseId) {
   if (!round || typeof round !== 'object') return fallback;
   const fallbackRound = fallback || createEmptyRound(fallbackCourseId);
   const scores = Array.isArray(round.scores) ? round.scores : [];
+  const putts = Array.isArray(round.putts) ? round.putts : [];
   const fir = Array.isArray(round.fir) ? round.fir : [];
   const gir = Array.isArray(round.gir) ? round.gir : [];
   const activeHoleIndex = Number(round.activeHoleIndex);
@@ -153,6 +157,7 @@ function normalizeRound(round, fallback, fallbackCourseId) {
     courseHoles: Array.isArray(round.courseHoles) ? round.courseHoles : undefined,
     activeHoleIndex: Number.isInteger(activeHoleIndex) && activeHoleIndex >= 0 && activeHoleIndex < 18 ? activeHoleIndex : 0,
     scores: Array.from({ length: 18 }, (_, index) => normalizeScore(scores[index])),
+    putts: Array.from({ length: 18 }, (_, index) => normalizePutts(putts[index])),
     fir: Array.from({ length: 18 }, (_, index) => normalizeBoolean(fir[index])),
     gir: Array.from({ length: 18 }, (_, index) => normalizeBoolean(gir[index])),
   };
@@ -161,6 +166,27 @@ function normalizeRound(round, fallback, fallbackCourseId) {
 function normalizeScore(value) {
   const score = Number(value);
   return Number.isInteger(score) && score > 0 ? score : null;
+}
+
+function normalizePutts(value) {
+  if (value === '4++') return '4++';
+  if (value === null || value === undefined || value === '') return null;
+  const putts = Number(value);
+  return Number.isInteger(putts) && putts >= 0 && putts <= 3 ? putts : null;
+}
+
+function normalizeWheelValue(field, value) {
+  if (field === 'score') return normalizeScore(value);
+  if (field === 'putts') return normalizePutts(value);
+  return null;
+}
+
+function formatWheelValue(value) {
+  return value === null || value === undefined ? '—' : String(value);
+}
+
+function serializeWheelValue(value) {
+  return value === null || value === undefined ? '' : String(value);
 }
 
 function normalizeBoolean(value) {
@@ -215,6 +241,10 @@ function getCurrentScore() {
   return state.currentRound.scores[state.currentRound.activeHoleIndex];
 }
 
+function getCurrentPutts() {
+  return state.currentRound.putts?.[state.currentRound.activeHoleIndex] ?? null;
+}
+
 function getCurrentRegulationStat(stat) {
   return state.currentRound[stat]?.[state.currentRound.activeHoleIndex] === true;
 }
@@ -253,8 +283,33 @@ function setCurrentScore(nextScore) {
   renderApp();
 }
 
+function setCurrentPutts(nextPutts) {
+  state.currentRound.courseId = getActiveCourse().id;
+  if (!Array.isArray(state.currentRound.putts)) {
+    state.currentRound.putts = Array(18).fill(null);
+  }
+  state.currentRound.putts[state.currentRound.activeHoleIndex] = normalizePutts(nextPutts);
+  state.currentRound.updatedAt = new Date().toISOString();
+  saveState();
+  renderApp();
+}
+
+function setCurrentWheelValue(field, value) {
+  if (field === 'score') setCurrentScore(value);
+  if (field === 'putts') setCurrentPutts(value);
+}
+
+function stepCurrentWheelValue(field, direction) {
+  const values = field === 'score' ? SCORE_WHEEL_VALUES : field === 'putts' ? PUTTS_WHEEL_VALUES : [];
+  if (!values.length) return;
+  const currentValue = field === 'score' ? getCurrentScore() : getCurrentPutts();
+  const currentIndex = values.findIndex((value) => normalizeWheelValue(field, value) === currentValue);
+  const nextIndex = Math.min(values.length - 1, Math.max(0, (currentIndex < 0 ? 0 : currentIndex) + direction));
+  setCurrentWheelValue(field, values[nextIndex]);
+}
+
 function roundHasScores(round) {
-  return round.scores.some((score) => Number.isFinite(score));
+  return round.scores.some((score) => Number.isFinite(score)) || round.putts?.some((putt) => putt !== null && putt !== undefined);
 }
 
 function snapshotCurrentRound() {
@@ -267,6 +322,7 @@ function snapshotCurrentRound() {
     courseName: course.name,
     courseHoles: course.holes.map((hole) => ({ ...hole })),
     scores: [...state.currentRound.scores],
+    putts: Array.from({ length: 18 }, (_, index) => normalizePutts(state.currentRound.putts?.[index])),
     fir: Array.from({ length: 18 }, (_, index) => state.currentRound.fir?.[index] === true),
     gir: Array.from({ length: 18 }, (_, index) => state.currentRound.gir?.[index] === true),
   };
@@ -455,6 +511,36 @@ function getRoundRegulationTotal(round, stat) {
   return round[stat].filter((value) => value === true).length;
 }
 
+function getHolePutts(holeIndex, rounds = getActiveCourseRounds()) {
+  return rounds.map((round) => normalizePutts(round.putts?.[holeIndex]));
+}
+
+function formatPuttDisplay(value) {
+  return formatWheelValue(normalizePutts(value));
+}
+
+function getRoundPuttsSummary(round) {
+  const putts = Array.from({ length: 18 }, (_, index) => normalizePutts(round?.putts?.[index]));
+  const hasOver = putts.includes('4++');
+  const hasUnset = putts.some((value) => value === null);
+  const total = putts.reduce((sum, value) => {
+    if (value === '4++') return sum + 4;
+    if (Number.isInteger(value)) return sum + value;
+    return sum;
+  }, 0);
+  return { total, hasOver, hasUnset, marker: `${hasOver ? '++' : ''}${hasUnset ? '!' : ''}` };
+}
+
+function formatRoundPuttsSummary(round) {
+  const summary = getRoundPuttsSummary(round);
+  return `${summary.total}${summary.marker}`;
+}
+
+function renderRoundPuttsSummary(round) {
+  const summary = getRoundPuttsSummary(round);
+  return `${summary.total}${summary.hasOver ? '<span class="putts-marker putts-marker-over">++</span>' : ''}${summary.hasUnset ? '<span class="putts-marker putts-marker-unset">!</span>' : ''}`;
+}
+
 function getPlayedHoleCount(round = state.currentRound) {
   return round.scores.filter((score) => Number.isFinite(score)).length;
 }
@@ -507,6 +593,39 @@ function renderApp() {
   renderSetupView();
   renderDataView();
   renderRoundConfirmDrawer();
+  requestAnimationFrame(alignWheelPickers);
+}
+
+function renderWheelPicker({ field, label, icon, value, values, variant = 'score' }) {
+  return `
+    <div class="wheel-control wheel-control-${variant}">
+      <span class="stat-label"><span aria-hidden="true">${icon}</span> ${label}</span>
+      <div class="number-wheel" data-wheel-field="${field}" role="listbox" aria-label="${label}" tabindex="0">
+        ${values.map((option) => {
+          const normalized = normalizeWheelValue(field, option);
+          const isSelected = normalized === value;
+          return `
+            <button
+              type="button"
+              class="wheel-option ${isSelected ? 'is-selected' : ''}"
+              data-action="pick-wheel-value"
+              data-wheel-field="${field}"
+              data-wheel-value="${serializeWheelValue(option)}"
+              role="option"
+              aria-selected="${isSelected}"
+              ${isSelected ? 'aria-current="true"' : ''}
+            >${formatWheelValue(option)}</button>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function alignWheelPickers() {
+  document.querySelectorAll('.number-wheel [aria-current="true"]').forEach((option) => {
+    option.scrollIntoView({ inline: 'center', block: 'nearest' });
+  });
 }
 
 function renderRoundConfirmDrawer() {
@@ -553,6 +672,7 @@ function renderPlayView() {
   const course = getActiveCourse();
   const hole = getCurrentHole();
   const score = getCurrentScore();
+  const putts = getCurrentPutts();
   const gross = getRoundGrossScore(state.currentRound);
   const toPar = getRoundToParScore(state.currentRound, course);
   const played = getPlayedHoleCount();
@@ -605,13 +725,23 @@ function renderPlayView() {
         </div>
       </div>
 
-      <div class="score-control" aria-label="Stroke input">
-        <span class="stat-label">Gross strokes</span>
-        <div class="score-row">
-          <button type="button" class="score-button" data-action="decrement-score" aria-label="Decrease score">−</button>
-          <span class="score-value ${score ? '' : 'score-empty'}" aria-live="polite">${score ?? '—'}</span>
-          <button type="button" class="score-button" data-action="increment-score" aria-label="Increase score">+</button>
-        </div>
+      <div class="score-control" aria-label="Stroke and putting input">
+        ${renderWheelPicker({
+          field: 'score',
+          label: 'Gross strokes',
+          icon: '🧮',
+          value: score,
+          values: SCORE_WHEEL_VALUES,
+          variant: 'score',
+        })}
+        ${renderWheelPicker({
+          field: 'putts',
+          label: 'Putts',
+          icon: '⛳',
+          value: putts,
+          values: PUTTS_WHEEL_VALUES,
+          variant: 'putts',
+        })}
       </div>
 
       <div class="regulation-row" aria-label="Regulation stats for current hole">
@@ -685,7 +815,7 @@ function renderHistoryView() {
         <p class="section-kicker">Last 10 rounds</p>
         <h3 class="history-summary-title">Recent rounds.</h3>
         <div class="round-total-list" aria-label="Last 10 round totals">
-          ${recentRounds.length ? recentRounds.map((roundData) => renderRoundTotalRow(roundData)).join('') : `
+          ${recentRounds.length ? renderRecentRoundsTable(recentRounds) : `
             <p class="section-copy history-empty-note">No archived rounds yet.</p>
           `}
         </div>
@@ -694,44 +824,70 @@ function renderHistoryView() {
   `;
 }
 
+function renderRecentRoundsTable(recentRounds) {
+  const headers = ['Date', 'Gross', 'To-Par', 'Played/Holes', 'Tot-Putts', 'Tot-FIR', 'Tot-GIR'];
+  return `
+    <div class="recent-rounds-table-wrap">
+      <table class="recent-rounds-table">
+        <thead>
+          <tr>${headers.map((header) => `<th scope="col">${header}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+          ${recentRounds.slice(0, 10).map((roundData) => renderRoundTotalRow(roundData)).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function renderRoundTotalRow({ round, grossTotal, toParTotal, holesPlayed, firTotal, girTotal }) {
   const dateLabel = formatRoundDate(round);
   return `
-    <div class="round-total-row">
-      <span class="round-total-main round-total-date">${escapeHtml(dateLabel)}</span>
-      <span class="round-total-stat"><strong>${grossTotal || '—'}</strong> gross</span>
-      <span class="round-total-stat"><strong>${holesPlayed ? formatToParScore(toParTotal) : '—'}</strong> par</span>
-      <span class="round-total-stat"><strong>${holesPlayed}</strong>/18</span>
-      <span class="round-total-stat"><strong>${firTotal}</strong> Total FIR</span>
-      <span class="round-total-stat"><strong>${girTotal}</strong> Total GIR</span>
-    </div>
+    <tr class="round-total-row">
+      <td class="round-total-main round-total-date">${escapeHtml(dateLabel)}</td>
+      <td><strong>${grossTotal || '—'}</strong></td>
+      <td><strong>${holesPlayed ? formatToParScore(toParTotal) : '—'}</strong></td>
+      <td><strong>${holesPlayed}</strong>/18</td>
+      <td><strong>${renderRoundPuttsSummary(round)}</strong></td>
+      <td><strong>${firTotal}</strong></td>
+      <td><strong>${girTotal}</strong></td>
+    </tr>
   `;
 }
 
 function renderHistoryRow(hole, index, rounds) {
   const metrics = getHoleMetrics(index, rounds);
-  const regulationTotals = getHoleRegulationTotals(index, rounds);
   const lastTen = rounds
     .map((round) => round.scores?.[index])
-    .filter((score) => Number.isFinite(score))
+    .slice(0, 10);
+  const lastTenPutts = getHolePutts(index, rounds).slice(0, 10);
+  const lastTenFir = rounds
+    .map((round) => round.fir?.[index] === true)
+    .slice(0, 10);
+  const lastTenGir = rounds
+    .map((round) => round.gir?.[index] === true)
     .slice(0, 10);
   const avg = metrics.avg === null ? '—' : metrics.avg.toFixed(1);
-  const regulationDenominator = regulationTotals.total || 0;
 
   return `
     <article class="history-row">
       <div class="history-hole">#${hole.number}</div>
       <div class="history-meta">Par ${hole.par}<br>${hole.yardage} yds</div>
       <div class="history-scores">
-        <div class="score-pills" aria-label="Last 10 scores for hole ${hole.number}">
-          ${lastTen.length ? lastTen.map((score) => `<span class="score-pill">${score}</span>`).join('') : '<span class="score-pill">—</span>'}
+        <div class="score-pills gross-pills" aria-label="Last 10 gross scores for hole ${hole.number}">
+          <span class="gross-label">Gross</span>
+          ${lastTen.length ? lastTen.map((score) => `<span class="score-pill">${Number.isFinite(score) ? score : '—'}</span>`).join('') : '<span class="score-pill">—</span>'}
+        </div>
+        <div class="putt-pills" aria-label="Last 10 putts for hole ${hole.number}">
+          <span class="putt-label">Putts</span>
+          ${lastTenPutts.length ? lastTenPutts.map((putt) => `<span class="score-pill putt-pill">${formatPuttDisplay(putt)}</span>`).join('') : '<span class="score-pill putt-pill">—</span>'}
         </div>
         <div class="metric-pills" aria-label="Metrics for hole ${hole.number}">
           <span class="metric-pill badge-low">Low ${metrics.low ?? '—'}</span>
           <span class="metric-pill badge-high">High ${metrics.high ?? '—'}</span>
           <span class="metric-pill">Avg ${avg}</span>
-          <span class="metric-pill">FIR ${regulationTotals.fir}/${regulationDenominator}</span>
-          <span class="metric-pill">GIR ${regulationTotals.gir}/${regulationDenominator}</span>
+          ${lastTenFir.length ? lastTenFir.map((isSet) => `<span class="metric-pill">FIR ${isSet ? '🗸' : 'x'}</span>`).join('') : '<span class="metric-pill">FIR x</span>'}
+          ${lastTenGir.length ? lastTenGir.map((isSet) => `<span class="metric-pill">GIR ${isSet ? '🗸' : 'x'}</span>`).join('') : '<span class="metric-pill">GIR x</span>'}
         </div>
       </div>
     </article>
@@ -856,6 +1012,7 @@ function handleClick(event) {
   const currentIndex = state.currentRound.activeHoleIndex;
   const currentScore = getCurrentScore();
 
+  if (action === 'pick-wheel-value') setCurrentWheelValue(actionButton.dataset.wheelField, actionButton.dataset.wheelValue);
   if (action === 'increment-score') setCurrentScore((currentScore || 0) + 1);
   if (action === 'decrement-score') setCurrentScore(currentScore && currentScore > 1 ? currentScore - 1 : null);
   if (action === 'previous-hole') setActiveHole(Math.max(0, currentIndex - 1));
@@ -906,6 +1063,10 @@ function handleSubmit(event) {
 }
 
 function handleChange(event) {
+  if (event.target.matches('[data-wheel-field]')) {
+    setCurrentWheelValue(event.target.dataset.wheelField, event.target.value);
+    return;
+  }
   if (event.target.matches('[data-reg-field]')) {
     setCurrentRegulationStat(event.target.dataset.regField, event.target.checked);
     return;
@@ -919,6 +1080,19 @@ function handleChange(event) {
   if (event.target.matches('[data-action="select-delete-rounds-course"]')) {
     const button = document.querySelector('[data-action="delete-course-rounds"]');
     if (button) button.dataset.courseId = event.target.value;
+  }
+}
+
+function handleKeydown(event) {
+  const wheel = event.target.closest('.number-wheel[data-wheel-field]');
+  if (!wheel) return;
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    stepCurrentWheelValue(wheel.dataset.wheelField, 1);
+  }
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    stepCurrentWheelValue(wheel.dataset.wheelField, -1);
   }
 }
 
@@ -964,6 +1138,7 @@ function resetData() {
 document.addEventListener('click', handleClick);
 document.addEventListener('submit', handleSubmit);
 document.addEventListener('change', handleChange);
+document.addEventListener('keydown', handleKeydown);
 renderApp();
 
 globalThis.BackspinApp = {
@@ -978,6 +1153,11 @@ globalThis.BackspinApp = {
   getHoleMetrics,
   getHoleRegulationTotals,
   getRoundRegulationTotal,
+  getHolePutts,
+  getRoundPuttsSummary,
+  formatRoundPuttsSummary,
+  renderRoundPuttsSummary,
+  formatPuttDisplay,
   getLastFiveScoresForHole,
   getRoundGrossScore,
   getRoundToParScore,
@@ -997,6 +1177,9 @@ globalThis.BackspinApp = {
   setActiveView,
   setActiveHole,
   setCurrentScore,
+  setCurrentPutts,
+  setCurrentWheelValue,
+  stepCurrentWheelValue,
   setCurrentRegulationStat,
   toggleRegulationHelp,
 };

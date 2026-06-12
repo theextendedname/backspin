@@ -340,10 +340,104 @@ textarea:focus-visible {
 
 .score-control {
   display: grid;
-  place-items: center;
-  gap: 14px;
+  place-items: stretch;
+  gap: 12px;
   padding: 10px 0 2px;
   text-align: center;
+}
+
+.wheel-control {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.number-wheel {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 64px;
+  gap: 8px;
+  width: min(360px, 100%);
+  min-height: 78px;
+  align-items: center;
+  padding: 10px calc(50% - 32px);
+  border: 1px solid rgba(214, 182, 111, 0.34);
+  border-radius: 26px;
+  background:
+    linear-gradient(90deg, var(--card-strong), transparent 18%, transparent 82%, var(--card-strong)),
+    rgba(214, 182, 111, 0.08);
+  box-shadow: inset 0 16px 32px rgba(255, 255, 255, 0.25), inset 0 -14px 28px rgba(92, 72, 36, 0.08);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.number-wheel::-webkit-scrollbar {
+  display: none;
+}
+
+.number-wheel::after {
+  content: '';
+  position: absolute;
+  inset: 8px calc(50% - 38px);
+  border: 1px solid rgba(214, 182, 111, 0.44);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.wheel-option {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: 64px;
+  height: 56px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--muted);
+  background: var(--pill-bg);
+  font-size: 1.35rem;
+  font-weight: 900;
+  scroll-snap-align: center;
+  transition: transform 140ms ease, color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.wheel-option.is-selected {
+  transform: scale(1.12);
+  color: #18130a;
+  border-color: transparent;
+  background: linear-gradient(145deg, #f1d58f, #c99b46);
+  font-size: 1.75rem;
+}
+
+.wheel-control-putts .number-wheel {
+  border-color: rgba(41, 122, 60, 0.34);
+  background:
+    linear-gradient(90deg, var(--card-strong), transparent 18%, transparent 82%, var(--card-strong)),
+    rgba(41, 122, 60, 0.08);
+}
+
+.wheel-control-putts .number-wheel::after {
+  border-color: rgba(41, 122, 60, 0.42);
+}
+
+.wheel-control-putts .wheel-option.is-selected {
+  color: #102012;
+  background: linear-gradient(145deg, #d8f4dc, #73c282);
+}
+
+[data-theme="dark"] .number-wheel {
+  box-shadow: inset 0 16px 32px rgba(255, 255, 255, 0.04), inset 0 -14px 28px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="dark"] .wheel-control-putts .number-wheel {
+  background:
+    linear-gradient(90deg, var(--card-strong), transparent 18%, transparent 82%, var(--card-strong)),
+    rgba(123, 211, 137, 0.09);
 }
 
 .regulation-row {
@@ -597,38 +691,58 @@ textarea:focus-visible {
 }
 
 .round-total-list {
-  display: grid;
-  gap: 6px;
+  overflow-x: auto;
 }
 
-.round-total-row {
-  display: grid;
-  grid-template-columns: minmax(58px, 1fr) auto auto auto auto auto;
-  gap: 8px;
-  align-items: center;
-  min-height: 36px;
-  padding: 7px 9px;
+.recent-rounds-table-wrap {
+  overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--control-bg);
+}
+
+.recent-rounds-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
   white-space: nowrap;
 }
 
-.round-total-main,
-.round-total-stat strong {
+.recent-rounds-table th,
+.recent-rounds-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.recent-rounds-table th {
+  color: var(--text);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+}
+
+.recent-rounds-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.recent-rounds-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--card) 42%, transparent);
+}
+
+.recent-rounds-table td strong {
   color: var(--text);
   font-weight: 950;
 }
 
-.round-total-main.round-total-date {
+.recent-rounds-table .round-total-date {
   color: var(--text);
-}
-
-.round-total-date:not(.round-total-main),
-.round-total-stat {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 950;
 }
 
 .history-empty-note {
@@ -665,11 +779,45 @@ textarea:focus-visible {
 }
 
 .score-pills,
-.metric-pills {
+.metric-pills,
+.putt-pills {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 4px;
+}
+
+.gross-label,
+.putt-label {
+  display: inline-grid;
+  place-items: center;
+  color: var(--subtle);
+  font-size: 0.68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.putt-pill {
+  border-color: rgba(41, 122, 60, 0.24);
+  color: var(--green);
+  background: rgba(41, 122, 60, 0.08);
+}
+
+.putts-marker {
+  font-weight: 950;
+}
+
+.putts-marker-over {
+  color: var(--red);
+}
+
+.putts-marker-unset {
+  color: #1d63b8;
+}
+
+[data-theme="dark"] .putts-marker-unset {
+  color: #8cbcff;
 }
 
 .score-pill,
@@ -864,7 +1012,8 @@ button:disabled {
   }
 
   .history-scores .score-pills,
-  .history-scores .metric-pills {
+  .history-scores .metric-pills,
+  .history-scores .putt-pills {
     gap: 3px;
     justify-content: flex-end;
   }
@@ -883,15 +1032,14 @@ button:disabled {
     font-size: calc(0.62rem + 2px);
   }
 
-  .round-total-row {
-    grid-template-columns: minmax(52px, 1fr) repeat(5, auto);
-    gap: 5px 6px;
-    padding-inline: 8px;
+  .recent-rounds-table th,
+  .recent-rounds-table td {
+    padding: 8px 9px;
+    font-size: 0.7rem;
   }
 
-  .round-total-date,
-  .round-total-stat {
-    font-size: 0.7rem;
+  .recent-rounds-table th {
+    font-size: 0.62rem;
   }
 
   .drawer-stat-grid {
