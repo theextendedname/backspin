@@ -834,7 +834,7 @@ function renderHistoryView() {
 }
 
 function renderRecentRoundsTable(recentRounds) {
-  const headers = ['Date', 'Gross', 'To-Par', 'Played/Holes', 'Tot-Putts', 'Tot-FIR', 'Tot-GIR'];
+  const headers = ['Date', 'Gross', 'To-Par', 'Tot-FIR', 'Tot-GIR', 'Played/Holes', 'Tot-Putts'];
   return `
     <div class="recent-rounds-table-wrap">
       <table class="recent-rounds-table">
@@ -867,10 +867,10 @@ function renderRoundTotalRow({ round, grossTotal, toParTotal, holesPlayed, firTo
       <td class="round-total-main round-total-date">${escapeHtml(dateLabel)}</td>
       <td><strong>${grossTotal || '—'}</strong></td>
       <td><strong>${holesPlayed ? formatToParScore(toParTotal) : '—'}</strong></td>
-      <td><strong>${holesPlayed}</strong>/18</td>
-      <td><strong>${renderRoundPuttsSummary(round)}</strong></td>
       <td><strong>${firTotal}</strong></td>
       <td><strong>${girTotal}</strong></td>
+      <td><strong>${holesPlayed}</strong>/18</td>
+      <td><strong>${renderRoundPuttsSummary(round)}</strong></td>
     </tr>
   `;
 }
