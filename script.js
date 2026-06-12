@@ -1,7 +1,9 @@
 const STORAGE_KEY = 'backspin:v1';
 const VALID_VIEWS = ['play', 'history', 'setup', 'data'];
 const VALID_THEMES = ['light', 'dark'];
-const MAX_COURSES = 10;
+const MAX_COURSES = 20;
+const MAX_ROUNDS_PER_COURSE = 10;
+const MAX_ROUNDS_TOTAL = 200;
 const SCORE_WHEEL_VALUES = [null, ...Array.from({ length: 20 }, (_, index) => index + 1)];
 const PUTTS_WHEEL_VALUES = [null, 0, 1, 2, 3, '4++'];
 
@@ -113,7 +115,31 @@ function normalizeState(value) {
     courses,
     currentRound,
     roundHistory: Array.isArray(next.roundHistory)
-      ? next.roundHistory.map((round) => normalizeRound(round, null, activeCourseId)).filter(Boolean).slice(0, 20)
+      ? (() => {
+          const all = next.roundHistory
+            .map((round) => normalizeRound(round, null, activeCourseId))
+            .filter(Boolean);
+          const byCourse = new Map();
+          const ordered = [];
+          for (const round of all) {
+            const id = round.courseId || '';
+            if (!byCourse.has(id)) byCourse.set(id, []);
+            byCourse.get(id).push(round);
+          }
+          for (const [, rounds] of byCourse) ordered.push(...rounds);
+          // Apply the per-course cap (drop oldest of each course) then the global cap.
+          const capped = [];
+          const seen = new Map();
+          for (const round of ordered) {
+            const id = round.courseId || '';
+            const count = seen.get(id) || 0;
+            if (count >= MAX_ROUNDS_PER_COURSE) continue;
+            seen.set(id, count + 1);
+            capped.push(round);
+            if (capped.length >= MAX_ROUNDS_TOTAL) break;
+          }
+          return capped;
+        })()
       : [],
   };
 }
@@ -338,9 +364,18 @@ function snapshotCurrentRound() {
 }
 
 function archiveCurrentRoundIfNeeded() {
-  if (roundHasScores(state.currentRound)) {
-    state.roundHistory = [snapshotCurrentRound(), ...state.roundHistory].slice(0, 20);
+  if (!roundHasScores(state.currentRound)) return;
+  const snapshot = snapshotCurrentRound();
+  const courseId = snapshot.courseId;
+  // Per-course rolling window: drop the oldest of THIS course before prepending the new one.
+  const others = state.roundHistory.filter((round) => round.courseId !== courseId);
+  const sameCourse = state.roundHistory.filter((round) => round.courseId === courseId).slice(0, MAX_ROUNDS_PER_COURSE - 1);
+  let next = [snapshot, ...sameCourse, ...others];
+  // Global safety cap: trim from the back so the newest rounds per active courses are preserved.
+  if (next.length > MAX_ROUNDS_TOTAL) {
+    next = next.slice(0, MAX_ROUNDS_TOTAL);
   }
+  state.roundHistory = next;
 }
 
 function startNewRound() {
