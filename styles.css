@@ -642,6 +642,11 @@ textarea:focus-visible {
   margin: 10px 0 14px;
 }
 
+.drawer-primary-action {
+  width: 100%;
+  margin-top: 14px;
+}
+
 .drawer-stat-grid {
   display: grid;
   gap: 10px;
@@ -703,7 +708,7 @@ textarea:focus-visible {
 
 .recent-rounds-table {
   width: 100%;
-  min-width: 620px;
+  min-width: 760px;
   border-collapse: collapse;
   white-space: nowrap;
 }
@@ -743,6 +748,68 @@ textarea:focus-visible {
 .recent-rounds-table .round-total-date {
   color: var(--text);
   font-weight: 950;
+}
+
+.round-options-cell {
+  position: relative;
+  width: 54px;
+  overflow: visible;
+}
+
+.round-options-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--pill-bg);
+  cursor: pointer;
+  font-size: 1.05rem;
+  list-style: none;
+}
+
+.round-options-menu[popover] {
+  position: fixed;
+  inset: auto;
+  top: var(--round-menu-top, 8px);
+  left: var(--round-menu-left, 8px);
+  z-index: 60;
+  display: none;
+  min-width: 160px;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  color: var(--text);
+  background: var(--drawer-bg);
+  box-shadow: var(--shadow);
+}
+
+.round-options-menu[popover]:popover-open {
+  display: grid;
+}
+
+.round-options-menu button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  padding: 0 10px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.round-options-menu button:hover,
+.round-options-menu button:focus-visible {
+  background: var(--pill-bg);
+}
+
+.round-options-menu .round-option-delete {
+  color: var(--danger-text);
 }
 
 .table-header-with-help {

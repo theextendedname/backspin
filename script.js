@@ -9,6 +9,9 @@ const PUTTS_WHEEL_VALUES = [null, 0, 1, 2, 3, '4++'];
 
 let state = loadState();
 let isRoundConfirmOpen = false;
+let pendingContinueRoundId = null;
+let pendingDeleteRoundId = null;
+let modalReturnFocus = null;
 let activeRegulationHelp = null;
 let isPuttsHelpOpen = false;
 
@@ -247,6 +250,8 @@ function setActiveView(view) {
   }
   if (view !== 'history') {
     isPuttsHelpOpen = false;
+    pendingContinueRoundId = null;
+    pendingDeleteRoundId = null;
   }
   saveState();
   renderApp();
@@ -379,6 +384,7 @@ function archiveCurrentRoundIfNeeded() {
 }
 
 function startNewRound() {
+  modalReturnFocus = document.activeElement;
   isRoundConfirmOpen = true;
   renderApp();
   return false;
@@ -394,6 +400,68 @@ function confirmStartNewRound() {
   archiveCurrentRoundIfNeeded();
   state.currentRound = createEmptyRound(getActiveCourse().id);
   state.activeView = 'play';
+  saveState();
+  renderApp();
+  return true;
+}
+
+function deleteHistoryRound(roundId) {
+  if (!state.roundHistory.some((savedRound) => savedRound.id === roundId)) return false;
+  state.roundHistory = state.roundHistory.filter((savedRound) => savedRound.id !== roundId);
+  pendingDeleteRoundId = null;
+  saveState();
+  renderApp();
+  return true;
+}
+
+function openDeleteRoundDrawer(roundId) {
+  const round = getActiveCourseRounds().find((savedRound) => savedRound.id === roundId);
+  if (!round) return false;
+  modalReturnFocus = document.activeElement;
+  pendingDeleteRoundId = roundId;
+  renderApp();
+  return true;
+}
+
+function closeDeleteRoundDrawer() {
+  pendingDeleteRoundId = null;
+  renderApp();
+}
+
+function confirmDeleteRound() {
+  return deleteHistoryRound(pendingDeleteRoundId);
+}
+
+function openContinueRoundDrawer(roundId) {
+  const rounds = getActiveCourseRounds();
+  if (!rounds.length || rounds[0].id !== roundId) return false;
+  modalReturnFocus = document.activeElement;
+  pendingContinueRoundId = roundId;
+  renderApp();
+  return true;
+}
+
+function closeContinueRoundDrawer() {
+  pendingContinueRoundId = null;
+  renderApp();
+}
+
+function confirmContinueRound() {
+  const rounds = getActiveCourseRounds();
+  const round = rounds.find((savedRound) => savedRound.id === pendingContinueRoundId);
+  if (!round || rounds[0]?.id !== round.id) {
+    pendingContinueRoundId = null;
+    renderApp();
+    return false;
+  }
+
+  const resumedRound = normalizeRound(round, createEmptyRound(getActiveCourse().id), getActiveCourse().id);
+  resumedRound.completedAt = undefined;
+  resumedRound.updatedAt = new Date().toISOString();
+  state.roundHistory = state.roundHistory.filter((savedRound) => savedRound.id !== round.id);
+  state.currentRound = resumedRound;
+  state.activeView = 'play';
+  pendingContinueRoundId = null;
   saveState();
   renderApp();
   return true;
@@ -488,6 +556,25 @@ function deleteCourse(courseId = state.activeCourseId) {
 
 function getRoundGrossScore(round) {
   return round.scores.filter((score) => Number.isFinite(score)).reduce((sum, score) => sum + score, 0);
+}
+
+function getRoundGrossSplit(round) {
+  const getNineTotal = (scores) => {
+    const playedScores = scores.filter((score) => Number.isFinite(score));
+    return playedScores.length ? playedScores.reduce((sum, score) => sum + score, 0) : null;
+  };
+  const front = getNineTotal(round.scores.slice(0, 9));
+  const back = getNineTotal(round.scores.slice(9, 18));
+  return {
+    front,
+    back,
+    total: front === null && back === null ? null : (front || 0) + (back || 0),
+  };
+}
+
+function formatRoundGrossSplit(round) {
+  const { front, back, total } = getRoundGrossSplit(round);
+  return `${front ?? '—'}/${back ?? '—'}/${total ?? '—'}`;
 }
 
 function getRoundToParScore(round, course = getActiveCourse()) {
@@ -637,6 +724,9 @@ function renderApp() {
   renderSetupView();
   renderDataView();
   renderRoundConfirmDrawer();
+  renderContinueRoundDrawer();
+  renderDeleteRoundDrawer();
+  syncModalAccessibility();
   requestAnimationFrame(alignWheelPickers);
 }
 
@@ -686,6 +776,7 @@ function renderRoundConfirmDrawer() {
       <div class="drawer-handle" aria-hidden="true"></div>
       <p class="section-kicker">Round checkpoint</p>
       <h2 id="round-confirm-title" class="drawer-title">Start new round?</h2>
+      <button type="button" class="button drawer-primary-action" data-action="confirm-new-round">Start New Round</button>
       <p class="section-copy drawer-copy">This round will be saved to History before a fresh scorecard opens.</p>
       <div class="drawer-stat-grid" aria-label="Current round stats">
         <article class="stat-card">
@@ -702,12 +793,105 @@ function renderRoundConfirmDrawer() {
         </article>
       </div>
       <div class="drawer-actions">
-        <button type="button" class="button" data-action="confirm-new-round">Start New Round</button>
         <button type="button" class="secondary-button" data-action="close-round-confirm">Keep Playing</button>
       </div>
     </section>
   `;
   document.body.appendChild(drawer);
+}
+
+function renderContinueRoundDrawer() {
+  document.querySelector('[data-continue-round-drawer]')?.remove();
+  if (!pendingContinueRoundId) return;
+
+  const rounds = getActiveCourseRounds();
+  const round = rounds.find((savedRound) => savedRound.id === pendingContinueRoundId);
+  if (!round || rounds[0]?.id !== round.id) {
+    pendingContinueRoundId = null;
+    return;
+  }
+
+  const drawer = document.createElement('div');
+  drawer.className = 'round-confirm-shell';
+  drawer.dataset.continueRoundDrawer = 'true';
+  drawer.innerHTML = `
+    <button type="button" class="round-confirm-backdrop" data-action="close-continue-round" aria-label="Cancel continue play"></button>
+    <section class="round-confirm-drawer" role="dialog" aria-modal="true" aria-labelledby="continue-round-title">
+      <div class="drawer-handle" aria-hidden="true"></div>
+      <p class="section-kicker">Continue archived round</p>
+      <h2 id="continue-round-title" class="drawer-title">Continue playing?</h2>
+      <p class="section-copy drawer-copy">The ${escapeHtml(formatRoundDate(round))} round will be moved from History back into the Play view. Any scores, putts, FIR, or GIR data currently in Play will be overwritten and lost.</p>
+      <div class="drawer-actions">
+        <button type="button" class="button" data-action="confirm-continue-round">Continue Play</button>
+        <button type="button" class="secondary-button" data-action="close-continue-round">Cancel</button>
+      </div>
+    </section>
+  `;
+  document.body.appendChild(drawer);
+}
+
+function renderDeleteRoundDrawer() {
+  document.querySelector('[data-delete-round-drawer]')?.remove();
+  if (!pendingDeleteRoundId) return;
+
+  const round = getActiveCourseRounds().find((savedRound) => savedRound.id === pendingDeleteRoundId);
+  if (!round) {
+    pendingDeleteRoundId = null;
+    return;
+  }
+
+  const drawer = document.createElement('div');
+  drawer.className = 'round-confirm-shell';
+  drawer.dataset.deleteRoundDrawer = 'true';
+  drawer.innerHTML = `
+    <button type="button" class="round-confirm-backdrop" data-action="close-delete-round" aria-label="Cancel round deletion"></button>
+    <section class="round-confirm-drawer" role="dialog" aria-modal="true" aria-labelledby="delete-round-title">
+      <div class="drawer-handle" aria-hidden="true"></div>
+      <p class="section-kicker">History cleanup</p>
+      <h2 id="delete-round-title" class="drawer-title">Delete this round?</h2>
+      <p class="section-copy drawer-copy">The ${escapeHtml(formatRoundDate(round))} round and all of its score data will be permanently removed from History. Later rounds will shift up to fill its place.</p>
+      <div class="drawer-actions">
+        <button type="button" class="danger-button" data-action="confirm-delete-round">Delete Round</button>
+        <button type="button" class="secondary-button" data-action="close-delete-round">Keep Round</button>
+      </div>
+    </section>
+  `;
+  document.body.appendChild(drawer);
+}
+
+function syncModalAccessibility() {
+  const modal = document.querySelector('[data-round-confirm-drawer], [data-continue-round-drawer], [data-delete-round-drawer]');
+  const main = document.querySelector('.app-shell');
+  if (main) main.inert = Boolean(modal);
+
+  if (modal) {
+    if (!modal.contains(document.activeElement)) {
+      requestAnimationFrame(() => {
+        const initialFocus = modal.querySelector('.round-confirm-drawer [data-action="close-delete-round"], .round-confirm-drawer .button, .round-confirm-drawer .secondary-button');
+        initialFocus?.focus();
+      });
+    }
+    return;
+  }
+
+  if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
+  modalReturnFocus = null;
+}
+
+function positionRoundOptions(button) {
+  const menuId = button.getAttribute('popovertarget');
+  const menu = menuId ? document.getElementById(menuId) : null;
+  if (!menu) return;
+  const rect = button.getBoundingClientRect();
+  const menuWidth = 160;
+  const menuHeight = menu.querySelectorAll('button').length * 38 + 10;
+  const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth));
+  const below = rect.bottom + 5;
+  const top = below + menuHeight <= window.innerHeight - 8
+    ? below
+    : Math.max(8, rect.top - menuHeight - 5);
+  menu.style.setProperty('--round-menu-left', `${left}px`);
+  menu.style.setProperty('--round-menu-top', `${top}px`);
 }
 
 function renderPlayView() {
@@ -869,7 +1053,7 @@ function renderHistoryView() {
 }
 
 function renderRecentRoundsTable(recentRounds) {
-  const headers = ['Date', 'Gross', 'To-Par', 'Tot-FIR', 'Tot-GIR', 'Tot-Putts', 'Played/Holes'];
+  const headers = ['Date', 'Gross F/B/T', 'To-Par', 'Tot-FIR', 'Tot-GIR', 'Tot-Putts', 'Played/Holes', 'Options'];
   return `
     <div class="recent-rounds-table-wrap">
       <table class="recent-rounds-table">
@@ -883,7 +1067,7 @@ function renderRecentRoundsTable(recentRounds) {
           `).join('')}</tr>
         </thead>
         <tbody>
-          ${recentRounds.slice(0, 10).map((roundData) => renderRoundTotalRow(roundData)).join('')}
+          ${recentRounds.slice(0, 10).map((roundData, index) => renderRoundTotalRow(roundData, index === 0, index)).join('')}
         </tbody>
       </table>
     </div>
@@ -895,17 +1079,25 @@ function renderRecentRoundsTable(recentRounds) {
   `;
 }
 
-function renderRoundTotalRow({ round, grossTotal, toParTotal, holesPlayed, firTotal, girTotal }) {
+function renderRoundTotalRow({ round, toParTotal, holesPlayed, firTotal, girTotal }, canContinue = false, rowIndex = 0) {
   const dateLabel = formatRoundDate(round);
+  const menuId = `round-options-${rowIndex}`;
   return `
     <tr class="round-total-row">
       <td class="round-total-main round-total-date">${escapeHtml(dateLabel)}</td>
-      <td><strong>${grossTotal || '—'}</strong></td>
+      <td><strong>${formatRoundGrossSplit(round)}</strong></td>
       <td><strong>${holesPlayed ? formatToParScore(toParTotal) : '—'}</strong></td>
       <td><strong>${firTotal}</strong></td>
       <td><strong>${girTotal}</strong></td>
       <td><strong>${renderRoundPuttsSummary(round)}</strong></td>
       <td><strong>${holesPlayed}</strong>/18</td>
+      <td class="round-options-cell">
+        <button type="button" class="round-options-button" data-action="position-round-options" popovertarget="${menuId}" aria-label="Options for ${escapeHtml(dateLabel)} round">⛮</button>
+        <div id="${menuId}" class="round-options-menu" popover>
+          ${canContinue ? `<button type="button" data-action="continue-history-round" data-round-id="${escapeHtml(round.id)}">Continue Play</button>` : ''}
+          <button type="button" class="round-option-delete" data-action="delete-history-round" data-round-id="${escapeHtml(round.id)}">Delete Round</button>
+        </div>
+      </td>
     </tr>
   `;
 }
@@ -1081,8 +1273,15 @@ function handleClick(event) {
   if (action === 'new-round') startNewRound();
   if (action === 'show-reg-help') toggleRegulationHelp(actionButton.dataset.regHelp);
   if (action === 'show-putts-help') togglePuttsHelp();
+  if (action === 'position-round-options') positionRoundOptions(actionButton);
   if (action === 'confirm-new-round') confirmStartNewRound();
   if (action === 'close-round-confirm') closeRoundConfirmDrawer();
+  if (action === 'continue-history-round') openContinueRoundDrawer(actionButton.dataset.roundId);
+  if (action === 'close-continue-round') closeContinueRoundDrawer();
+  if (action === 'confirm-continue-round') confirmContinueRound();
+  if (action === 'delete-history-round') openDeleteRoundDrawer(actionButton.dataset.roundId);
+  if (action === 'close-delete-round') closeDeleteRoundDrawer();
+  if (action === 'confirm-delete-round') confirmDeleteRound();
   if (action === 'toggle-theme') toggleTheme();
   if (action === 'add-course') addCourse();
   if (action === 'copy-course') copyCourse();
@@ -1146,6 +1345,31 @@ function handleChange(event) {
 }
 
 function handleKeydown(event) {
+  const modal = document.querySelector('[data-round-confirm-drawer], [data-continue-round-drawer], [data-delete-round-drawer]');
+  if (modal) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (pendingDeleteRoundId) closeDeleteRoundDrawer();
+      else if (pendingContinueRoundId) closeContinueRoundDrawer();
+      else closeRoundConfirmDrawer();
+      return;
+    }
+    if (event.key === 'Tab') {
+      const focusable = [...modal.querySelectorAll('.round-confirm-drawer button:not([disabled])')];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    return;
+  }
+
   const wheel = event.target.closest('.number-wheel[data-wheel-field]');
   if (!wheel) return;
   if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
@@ -1222,6 +1446,8 @@ globalThis.BackspinApp = {
   formatPuttDisplay,
   getLastFiveScoresForHole,
   getRoundGrossScore,
+  getRoundGrossSplit,
+  formatRoundGrossSplit,
   getRoundToParScore,
   getRoundSummary,
   formatRoundSummaryMessage,
@@ -1229,6 +1455,13 @@ globalThis.BackspinApp = {
   startNewRound,
   confirmStartNewRound,
   closeRoundConfirmDrawer,
+  deleteHistoryRound,
+  openDeleteRoundDrawer,
+  closeDeleteRoundDrawer,
+  confirmDeleteRound,
+  openContinueRoundDrawer,
+  closeContinueRoundDrawer,
+  confirmContinueRound,
   activateCourse,
   addCourse,
   copyCourse,
