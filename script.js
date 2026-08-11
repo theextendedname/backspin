@@ -1055,7 +1055,7 @@ function renderHistoryView() {
 function renderRecentRoundsTable(recentRounds) {
   const headers = ['Date', 'Gross F/B/T', 'To-Par', 'Tot-FIR', 'Tot-GIR', 'Tot-Putts', 'Played/Holes', 'Options'];
   return `
-    <div class="recent-rounds-table-wrap">
+    <div class="recent-rounds-table-wrap recent-rounds-desktop">
       <table class="recent-rounds-table">
         <thead>
           <tr>${headers.map((header) => `
@@ -1071,6 +1071,9 @@ function renderRecentRoundsTable(recentRounds) {
         </tbody>
       </table>
     </div>
+    <div class="recent-rounds-mobile" aria-label="Last 10 round summaries">
+      ${recentRounds.slice(0, 10).map((roundData, index) => renderMobileRoundSummary(roundData, index === 0, index)).join('')}
+    </div>
     ${isPuttsHelpOpen ? `
       <div id="putts-help-panel" class="regulation-help putts-help" data-putts-help-panel role="status">
         <strong>Tot-Putts</strong> — ++ means a 4++ was selected for at least one hole. ! means at least one hole was unset.
@@ -1079,9 +1082,54 @@ function renderRecentRoundsTable(recentRounds) {
   `;
 }
 
+function renderMobileRoundSummary({ round, toParTotal, holesPlayed, firTotal, girTotal }, canContinue = false, rowIndex = 0) {
+  const dateLabel = formatRoundDate(round);
+  const menuId = `round-options-mobile-${rowIndex}`;
+  return `
+    <article class="mobile-round-card">
+      <div class="mobile-round-primary">
+        <div class="mobile-round-metric mobile-round-date">
+          <span>Date</span>
+          <strong>${escapeHtml(dateLabel)}</strong>
+        </div>
+        <div class="mobile-round-metric mobile-round-gross">
+          <span>Gross F/B/T</span>
+          <strong>${formatRoundGrossSplit(round)}</strong>
+        </div>
+        <div class="mobile-round-metric mobile-round-to-par">
+          <span>To-Par</span>
+          <strong>${holesPlayed ? formatToParScore(toParTotal) : '—'}</strong>
+        </div>
+        <div class="mobile-round-metric mobile-round-holes">
+          <span>Holes</span>
+          <strong>${holesPlayed}/18</strong>
+        </div>
+        <div class="round-options-cell mobile-round-options">
+          <button type="button" class="round-options-button" data-action="position-round-options" popovertarget="${menuId}" aria-label="Options for ${escapeHtml(dateLabel)} round">⛮</button>
+          <div id="${menuId}" class="round-options-menu" popover>
+            ${canContinue ? `<button type="button" data-action="continue-history-round" data-round-id="${escapeHtml(round.id)}">Continue Play</button>` : ''}
+            <button type="button" class="round-option-delete" data-action="delete-history-round" data-round-id="${escapeHtml(round.id)}">Delete Round</button>
+          </div>
+        </div>
+      </div>
+      <details class="mobile-round-details">
+        <summary>Round details</summary>
+        <div class="mobile-round-detail-grid">
+          <div class="mobile-round-metric"><span>FIR</span><strong>${firTotal}</strong></div>
+          <div class="mobile-round-metric"><span>GIR</span><strong>${girTotal}</strong></div>
+          <div class="mobile-round-metric">
+            <span class="mobile-putts-label">Putts <button type="button" class="info-button table-info-button" data-action="show-putts-help" aria-label="What do putt markers mean?" aria-expanded="${isPuttsHelpOpen}" aria-controls="putts-help-panel">?</button></span>
+            <strong>${renderRoundPuttsSummary(round)}</strong>
+          </div>
+        </div>
+      </details>
+    </article>
+  `;
+}
+
 function renderRoundTotalRow({ round, toParTotal, holesPlayed, firTotal, girTotal }, canContinue = false, rowIndex = 0) {
   const dateLabel = formatRoundDate(round);
-  const menuId = `round-options-${rowIndex}`;
+  const menuId = `round-options-desktop-${rowIndex}`;
   return `
     <tr class="round-total-row">
       <td class="round-total-main round-total-date">${escapeHtml(dateLabel)}</td>
